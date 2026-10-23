@@ -1,0 +1,14 @@
+{
+  "name": "firmaya-connect-demo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Proyecto mínimo para probar la API de FirmaYa Connect: crear solicitudes de firma, compartir los enlaces y recibir el PDF firmado por webhook.",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  }
+}

@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FirmaYa Connect · Demo</title>
+    <style>
+      :root {
+        --bg: #f6f6f1;
+        --card: #fff;
+        --ink: #1e2a1a;
+        --muted: #5f6b5a;
+        --line: #e2e3d8;
+        --brand: #2b8a47;
+        --tint: #e3f1e6;
+        --warn: #b8860b;
+        --bad: #c0392b;
+      }
+      * { box-sizing: border-box; }
+      /* `hidden` must win over the buttons' own `display`. */
+      [hidden] { display: none !important; }
+      body { margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--ink); }
+      main { max-width: 960px; margin: 0 auto; padding: 32px 16px 64px; }
+      h1 { margin: 0; font-size: 1.6rem; }
+      h2 { margin: 0 0 12px; font-size: 1.05rem; }
+      .muted { color: var(--muted); }
+      .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px; margin-top: 20px; }
+      .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.78rem; font-weight: 600; background: var(--tint); color: var(--brand); }
+      .badge.staging { background: #fbf1d6; color: var(--warn); }
+      .badge.canceled, .badge.expired { background: #f3e1de; color: var(--bad); }
+      .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+      label { display: grid; gap: 4px; font-size: 0.85rem; font-weight: 600; }
+      input { width: 100%; min-width: 0; font: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; min-height: 44px; }
+      button, .button { font: inherit; font-weight: 600; min-height: 40px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
+      button.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+      button:disabled { opacity: 0.6; cursor: wait; }
+      .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+      .error { color: var(--bad); font-weight: 600; }
+      .signer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 10px 0; border-top: 1px solid var(--line); }
+      .signer a { word-break: break-all; color: var(--brand); }
+      code { font-size: 0.82rem; background: var(--bg); padding: 1px 6px; border-radius: 4px; word-break: break-all; }
+      ul.events { list-style: none; margin: 0; padding: 0; }
+      ul.events li { padding: 8px 0; border-top: 1px solid var(--line); font-size: 0.88rem; }
+      fieldset { border: 0; margin: 16px 0 0; padding: 0; }
+      legend { font-weight: 700; font-size: 0.9rem; margin-bottom: 8px; }
+      .signer-row { display: grid; gap: 8px; grid-template-columns: 1fr 1fr auto; align-items: end; margin-bottom: 8px; }
+      .signer-row button { min-height: 44px; }
+      @media (max-width: 560px) { .signer-row { grid-template-columns: 1fr; } }
+      .doc-count { margin: 12px 0 0; font-size: 0.88rem; font-weight: 600; color: var(--muted); }
+      .doc-count.full { color: var(--warn); }
+      .doc-count.over { color: var(--bad); }
+      ul.files { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+      ul.files li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 6px 6px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 0.88rem; }
+      ul.files li span { min-width: 0; overflow-wrap: anywhere; }
+      ul.files li button { min-height: 36px; padding: 0 12px; flex: none; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="row" style="justify-content: space-between">
+        <h1>FirmaYa Connect · Demo</h1>
+        <span id="env" class="badge"></span>
+      </div>
+      <p class="muted">
+        Crea una solicitud de firma por API, comparte el enlace con el firmante y recibe el PDF firmado por
+        webhook — o consulta su estado si el webhook no llega hasta aquí.
+      </p>
+
+      <form id="create" class="card">
+        <h2>1. Crear una solicitud</h2>
+        <div class="grid">
+          <label>Título<input name="title" value="Contrato de prueba" /></label>
+          <label>Agregar PDF (opcional, hasta 20)<input id="pdfs" type="file" accept="application/pdf" multiple /></label>
+        </div>
+        <p class="muted" style="font-size: 0.85rem">
+          Puedes elegirlos de a uno o varios a la vez: cada uno se suma a la lista. Hasta 20 PDF de máx. 10 MB
+          cada uno. Sin PDF, se envía un contrato de prueba generado aquí.
+        </p>
+        <p id="docCount" class="doc-count" aria-live="polite"></p>
+        <ul id="files" class="files" aria-label="PDF elegidos" hidden></ul>
+
+        <fieldset>
+          <legend>Firmantes (hasta 10)</legend>
+          <div id="signers"></div>
+          <button type="button" id="addSigner">+ Agregar firmante</button>
+        </fieldset>
+
+        <div class="row" style="margin-top: 16px">
+          <button id="submit" class="primary" type="submit">Crear solicitud</button>
+          <span id="createError" class="error" role="alert"></span>
+        </div>
+      </form>
+
+      <section class="card">
+        <h2>2. Solicitudes</h2>
+        <div id="envelopes" class="muted">Todavía no hay solicitudes.</div>
+      </section>
+
+      <section class="card">
+        <h2>3. Eventos de webhook</h2>
+        <p class="muted" style="font-size: 0.85rem">Webhook: <code id="webhookUrl"></code></p>
+        <ul id="events" class="events"><li class="muted">Todavía no llega ningún evento.</li></ul>
+      </section>
+    </main>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const escape = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+      const STATUS = { pending: "pendiente", completed: "completada", expired: "vencida", canceled: "cancelada" };
+      // The API's message is already written for a person; the code and the
+      // field are for the developer, so they go to the console, not the page.
+      const describe = (e) => {
+        console.warn("FirmaYa Connect:", e.code, e.field ?? "", e.message);
+        return e.message ?? "No se pudo completar la operación. Intenta de nuevo.";
+      };
+
+      async function api(path, options) {
+        const response = await fetch(path, options);
+        const data = await response.json();
+        if (!response.ok) throw data;
+        return data;
+      }
+
+      const toBase64 = (file) =>
+        new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result).split(",")[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+      // The API's own limits, checked here so a mistake is said before the upload.
+      const MAX_DOCUMENTS = 20;
+      const MAX_SIGNERS = 10;
+      const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
+      // The whole JSON body may not pass 30 MB, and base64 grows a file by a third.
+      const MAX_BODY_BYTES = 30 * 1024 * 1024;
+
+      function addSignerRow(name = "", cedula = "", focus = true) {
+        const rows = $("signers");
+        if (rows.children.length >= MAX_SIGNERS) return;
+        const n = rows.children.length + 1;
+        const row = document.createElement("div");
+        row.className = "signer-row";
+        row.innerHTML = `
+          <label>Nombre<input data-field="name" value="${escape(name)}" /></label>
+          <label>Cédula<input data-field="cedula" placeholder="1-1234-5678" value="${escape(cedula)}" required /></label>
+          <button type="button" data-remove-signer aria-label="Quitar firmante ${n}">Quitar</button>`;
+        rows.append(row);
+        syncSignerButtons();
+        if (focus) row.querySelector('[data-field="cedula"]').focus();
+      }
+
+      function syncSignerButtons() {
+        const rows = [...$("signers").children];
+        rows.forEach((row) => (row.querySelector("[data-remove-signer]").hidden = rows.length === 1));
+        $("addSigner").hidden = rows.length >= MAX_SIGNERS;
+      }
+
+      $("addSigner").addEventListener("click", () => addSignerRow());
+      $("signers").addEventListener("click", (event) => {
+        if (!event.target.matches("[data-remove-signer]")) return;
+        event.target.closest(".signer-row").remove();
+        syncSignerButtons();
+      });
+
+      // The PDFs picked so far. A file input replaces its selection on every
+      // pick, so the list is kept here and each pick adds to it.
+      let selected = [];
+      const sameFile = (a, b) => a.name === b.name && a.size === b.size && a.lastModified === b.lastModified;
+
+      function renderFiles() {
+        const n = selected.length;
+        const total = selected.reduce((sum, f) => sum + f.size, 0);
+        $("docCount").textContent =
+          `${n} de ${MAX_DOCUMENTS} documentos` + (n ? ` · ${sizeLabel(total)} en total` : "") +
+          (n > MAX_DOCUMENTS ? ` — quita ${n - MAX_DOCUMENTS} para poder enviar` : n === MAX_DOCUMENTS ? " — llegaste al máximo" : "");
+        $("docCount").className = `doc-count${n > MAX_DOCUMENTS ? " over" : n === MAX_DOCUMENTS ? " full" : ""}`;
+        $("files").hidden = n === 0;
+        $("files").innerHTML = selected
+          .map(
+            (f, i) => `<li><span>${escape(f.name)} · ${sizeLabel(f.size)}</span>
+              <button type="button" data-remove-file="${i}" aria-label="Quitar ${escape(f.name)}">Quitar</button></li>`,
+          )
+          .join("");
+      }
+
+      $("pdfs").addEventListener("change", () => {
+        for (const file of $("pdfs").files) {
+          if (!selected.some((f) => sameFile(f, file))) selected.push(file);
+        }
+        // Cleared so the same file can be picked again after removing it.
+        $("pdfs").value = "";
+        renderFiles();
+      });
+      $("files").addEventListener("click", (event) => {
+        const index = event.target.dataset.removeFile;
+        if (index === undefined) return;
+        selected.splice(Number(index), 1);
+        renderFiles();
+      });
+
+      const sizeLabel = (bytes) =>
+        bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+
+      /** Says what is wrong before anything is sent, or null when it fits. */
+      function checkLimits(files, signers) {
+        if (files.length > MAX_DOCUMENTS) return `Elige como máximo ${MAX_DOCUMENTS} PDF.`;
+        const big = files.find((f) => f.size > MAX_DOCUMENT_BYTES);
+        if (big) return `${big.name} pesa más de 10 MB.`;
+        const total = files.reduce((sum, f) => sum + f.size, 0);
+        if ((total * 4) / 3 > MAX_BODY_BYTES) return "Los PDF juntos pasan el límite de 30 MB por solicitud.";
+        if (!signers.length) return "Agrega al menos un firmante.";
+        if (signers.length > MAX_SIGNERS) return `Como máximo ${MAX_SIGNERS} firmantes.`;
+        return null;
+      }
+
+      function renderEnvelope(e) {
+        const signers = e.signers
+          .map(
+            (s) => `<div class="signer">
+              <div><strong>${escape(s.name || "Firmante")}</strong> · ${escape(s.cedula)}
+                <span class="badge ${s.status}">${s.status === "signed" ? "firmó" : "pendiente"}</span></div>
+              ${e.status === "pending" && s.status !== "signed" ? `<a href="${escape(s.sign_url)}" target="_blank" rel="noopener">Abrir enlace de firma ↗</a>` : ""}
+            </div>`,
+          )
+          .join("");
+        const docs = e.documents
+          .map((d) => `<a class="button" href="/api/envelopes/${e.id}/documents/${d.id}" target="_blank">${escape(d.filename)}${d.signed ? " (firmado)" : ""}</a>`)
+          .join("");
+        return `<div class="card" style="margin-top: 12px">
+          <div class="row" style="justify-content: space-between">
+            <strong>${escape(e.title)}</strong>
+            <span class="badge ${e.status}">${STATUS[e.status] ?? e.status}</span>
+          </div>
+          <p class="muted" style="font-size: 0.8rem; margin: 4px 0 0">id <code>${e.id}</code> · ${escape(e.external_id)}</p>
+          ${signers}
+          <div class="row" style="margin-top: 12px">
+            ${docs}
+            <button data-refresh="${e.id}">Actualizar estado</button>
+            ${e.status === "pending" ? `<button data-cancel="${e.id}">Cancelar</button>` : ""}
+          </div>
+        </div>`;
+      }
+
+      async function load() {
+        const s = await api("/api/state");
+        $("env").textContent = s.environment === "production" ? "Producción" : "Staging · sin validez legal";
+        $("env").className = `badge ${s.environment === "production" ? "" : "staging"}`;
+        $("webhookUrl").textContent = s.webhookUrl || "el del ambiente (panel)";
+        $("envelopes").innerHTML = s.envelopes.length ? s.envelopes.map(renderEnvelope).join("") : "Todavía no hay solicitudes.";
+        $("events").innerHTML = s.events.length
+          ? s.events
+              .map((ev) => `<li><strong>${escape(ev.type)}</strong> · <code>${escape(ev.envelopeId)}</code> · ${new Date(ev.receivedAt).toLocaleTimeString()}${ev.saved?.length ? `<br><span class="muted">Guardado en firmados/${ev.saved.map(escape).join(", ")}</span>` : ""}</li>`)
+              .join("")
+          : '<li class="muted">Todavía no llega ningún evento.</li>';
+      }
+
+      $("create").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const form = new FormData(event.target);
+        const button = $("submit");
+        const files = selected;
+        const signers = [...$("signers").children].map((row) => ({
+          name: row.querySelector('[data-field="name"]').value.trim(),
+          cedula: row.querySelector('[data-field="cedula"]').value.trim(),
+        }));
+        const problem = checkLimits(files, signers);
+        $("createError").textContent = problem ?? "";
+        if (problem) return;
+        button.disabled = true;
+        try {
+          const documents = await Promise.all(
+            files.map(async (file) => ({ filename: file.name, content: await toBase64(file) })),
+          );
+          await api("/api/envelopes", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title: form.get("title"), documents, signers }),
+          });
+          selected = [];
+          renderFiles();
+          await load();
+        } catch (error) {
+          $("createError").textContent = describe(error);
+        } finally {
+          button.disabled = false;
+        }
+      });
+
+      document.addEventListener("click", async (event) => {
+        const id = event.target.dataset.refresh || event.target.dataset.cancel;
+        if (!id) return;
+        event.target.disabled = true;
+        try {
+          await api(`/api/envelopes/${id}/${event.target.dataset.refresh ? "refresh" : "cancel"}`, { method: "POST" });
+          await load();
+        } catch (error) {
+          alert(describe(error));
+          event.target.disabled = false;
+        }
+      });
+
+      addSignerRow("María Rodríguez", "", false);
+      renderFiles();
+      load();
+      setInterval(load, 5000); // picks up webhook events as they arrive
+    </script>
+  </body>
+</html>
