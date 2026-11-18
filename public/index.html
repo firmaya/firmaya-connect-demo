@@ -29,8 +29,10 @@
       .badge.staging { background: #fbf1d6; color: var(--warn); }
       .badge.canceled, .badge.expired { background: #f3e1de; color: var(--bad); }
       .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+      select { background: var(--card); color: var(--ink); }
+      .hint { margin: 8px 0 0; font-size: 0.85rem; }
       label { display: grid; gap: 4px; font-size: 0.85rem; font-weight: 600; }
-      input { width: 100%; min-width: 0; font: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; min-height: 44px; }
+      input, select { width: 100%; min-width: 0; font: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; min-height: 44px; }
       button, .button { font: inherit; font-weight: 600; min-height: 40px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
       button.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
       button:disabled { opacity: 0.6; cursor: wait; }
@@ -43,9 +45,9 @@
       ul.events li { padding: 8px 0; border-top: 1px solid var(--line); font-size: 0.88rem; }
       fieldset { border: 0; margin: 16px 0 0; padding: 0; }
       legend { font-weight: 700; font-size: 0.9rem; margin-bottom: 8px; }
-      .signer-row { display: grid; gap: 8px; grid-template-columns: 1fr 1fr auto; align-items: end; margin-bottom: 8px; }
+      .signer-row { display: grid; gap: 8px; grid-template-columns: 1fr 1fr 1.3fr auto; align-items: end; margin-bottom: 8px; }
       .signer-row button { min-height: 44px; }
-      @media (max-width: 560px) { .signer-row { grid-template-columns: 1fr; } }
+      @media (max-width: 720px) { .signer-row { grid-template-columns: 1fr; } }
       .doc-count { margin: 12px 0 0; font-size: 0.88rem; font-weight: 600; color: var(--muted); }
       .doc-count.full { color: var(--warn); }
       .doc-count.over { color: var(--bad); }
@@ -83,6 +85,26 @@
           <legend>Firmantes (hasta 10)</legend>
           <div id="signers"></div>
           <button type="button" id="addSigner">+ Agregar firmante</button>
+          <p class="muted hint">
+            Con correo, FirmaYa le envía a ese firmante su enlace personal. Sin correo, compártelo tú.
+          </p>
+        </fieldset>
+
+        <fieldset>
+          <legend>Quién puede abrir los enlaces</legend>
+          <div class="grid">
+            <label>Acceso
+              <select id="audience">
+                <option value="">La opción del panel</option>
+                <option value="anyone">Externos: cualquier persona con el enlace</option>
+                <option value="organization">Internos: solo cuentas de la organización</option>
+              </select>
+            </label>
+            <label id="domainField" hidden>Dominio de la organización
+              <input id="domain" placeholder="empresa.com" autocomplete="off" />
+            </label>
+          </div>
+          <p id="audienceHint" class="muted hint"></p>
         </fieldset>
 
         <div class="row" style="margin-top: 16px">
@@ -136,6 +158,19 @@
       // The whole JSON body may not pass 30 MB, and base64 grows a file by a third.
       const MAX_BODY_BYTES = 30 * 1024 * 1024;
 
+      const AUDIENCE_HINT = {
+        "": "No se envía link_access: vale lo configurado en el panel de Connect.",
+        anyone: "El enlace se abre sin cuenta de FirmaYa, aunque el panel diga otra cosa.",
+        organization:
+          "Solo abre el enlace quien inicie sesión con un correo de ese dominio. Sin dominio, se usa el guardado en el panel.",
+      };
+      function syncAudience() {
+        const audience = $("audience").value;
+        $("domainField").hidden = audience !== "organization";
+        $("audienceHint").textContent = AUDIENCE_HINT[audience];
+      }
+      $("audience").addEventListener("change", syncAudience);
+
       function addSignerRow(name = "", cedula = "", focus = true) {
         const rows = $("signers");
         if (rows.children.length >= MAX_SIGNERS) return;
@@ -145,6 +180,7 @@
         row.innerHTML = `
           <label>Nombre<input data-field="name" value="${escape(name)}" /></label>
           <label>Cédula<input data-field="cedula" placeholder="1-1234-5678" value="${escape(cedula)}" required /></label>
+          <label>Correo (opcional)<input data-field="email" type="email" placeholder="ana@correo.cr" autocomplete="off" /></label>
           <button type="button" data-remove-signer aria-label="Quitar firmante ${n}">Quitar</button>`;
         rows.append(row);
         syncSignerButtons();
@@ -215,11 +251,18 @@
         return null;
       }
 
+      const accessLabel = (access) =>
+        !access
+          ? ""
+          : access.audience === "organization"
+            ? ` · internos (${escape(access.domain)})`
+            : " · externos (cualquiera con el enlace)";
+
       function renderEnvelope(e) {
         const signers = e.signers
           .map(
             (s) => `<div class="signer">
-              <div><strong>${escape(s.name || "Firmante")}</strong> · ${escape(s.cedula)}
+              <div><strong>${escape(s.name || "Firmante")}</strong> · ${escape(s.cedula)}${s.email ? ` · enlace enviado a ${escape(s.email)}` : ""}
                 <span class="badge ${s.status}">${s.status === "signed" ? "firmó" : "pendiente"}</span></div>
               ${e.status === "pending" && s.status !== "signed" ? `<a href="${escape(s.sign_url)}" target="_blank" rel="noopener">Abrir enlace de firma ↗</a>` : ""}
             </div>`,
@@ -233,7 +276,7 @@
             <strong>${escape(e.title)}</strong>
             <span class="badge ${e.status}">${STATUS[e.status] ?? e.status}</span>
           </div>
-          <p class="muted" style="font-size: 0.8rem; margin: 4px 0 0">id <code>${e.id}</code> · ${escape(e.external_id)}</p>
+          <p class="muted" style="font-size: 0.8rem; margin: 4px 0 0">id <code>${e.id}</code> · ${escape(e.external_id)}${accessLabel(e.link_access)}</p>
           ${signers}
           <div class="row" style="margin-top: 12px">
             ${docs}
@@ -261,10 +304,20 @@
         const form = new FormData(event.target);
         const button = $("submit");
         const files = selected;
-        const signers = [...$("signers").children].map((row) => ({
-          name: row.querySelector('[data-field="name"]').value.trim(),
-          cedula: row.querySelector('[data-field="cedula"]').value.trim(),
-        }));
+        const signers = [...$("signers").children].map((row) => {
+          const email = row.querySelector('[data-field="email"]').value.trim();
+          return {
+            name: row.querySelector('[data-field="name"]').value.trim(),
+            cedula: row.querySelector('[data-field="cedula"]').value.trim(),
+            ...(email ? { email } : {}), // only a signer with an address is mailed
+          };
+        });
+        const audience = $("audience").value;
+        const domain = $("domain").value.trim();
+        // Left on "la opción del panel", link_access is not sent at all.
+        const linkAccess = audience
+          ? { audience, ...(audience === "organization" && domain ? { domain } : {}) }
+          : undefined;
         const problem = checkLimits(files, signers);
         $("createError").textContent = problem ?? "";
         if (problem) return;
@@ -276,7 +329,7 @@
           await api("/api/envelopes", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ title: form.get("title"), documents, signers }),
+            body: JSON.stringify({ title: form.get("title"), documents, signers, linkAccess }),
           });
           selected = [];
           renderFiles();
@@ -302,6 +355,7 @@
       });
 
       addSignerRow("María Rodríguez", "", false);
+      syncAudience();
       renderFiles();
       load();
       setInterval(load, 5000); // picks up webhook events as they arrive

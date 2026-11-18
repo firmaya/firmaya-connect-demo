@@ -101,6 +101,7 @@ async function route(req, res) {
         externalId: `demo-${Date.now()}`,
         documents,
         signers: input.signers,
+        linkAccess: input.linkAccess,
       });
       state.envelopes[envelope.id] = envelope;
       save();

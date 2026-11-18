@@ -48,8 +48,13 @@ async function call(path, { method = "GET", body, idempotencyKey } = {}) {
 /**
  * `POST /envelopes`. `external_id` doubles as the Idempotency-Key: a retried
  * call with the same one returns the original envelope instead of a second.
+ *
+ * A signer with an `email` is also mailed their personal link by FirmaYa.
+ * `linkAccess` says who may open the links — `{ audience: "anyone" }` or
+ * `{ audience: "organization", domain }` — and, left out, the panel's option
+ * applies.
  */
-export function createEnvelope({ title, externalId, documents, signers }) {
+export function createEnvelope({ title, externalId, documents, signers, linkAccess }) {
   return call("/envelopes", {
     method: "POST",
     idempotencyKey: externalId,
@@ -59,6 +64,7 @@ export function createEnvelope({ title, externalId, documents, signers }) {
       ...(config.webhookUrl ? { webhook_url: config.webhookUrl } : {}),
       documents,
       signers,
+      ...(linkAccess ? { link_access: linkAccess } : {}),
       metadata: { origen: "firmaya-connect-demo" },
     },
   });

@@ -30,7 +30,8 @@ En el `.env`:
 
 ## Probar
 
-1. Abre `http://localhost:4000`, escribe la cédula del firmante y pulsa **Crear
+1. Abre `http://localhost:4000`, escribe la cédula del firmante (y, si quieres, su
+   correo) y pulsa **Crear
    solicitud**. Sin PDF, se envía un contrato de prueba generado por el proyecto.
 2. Pulsa **Abrir enlace de firma** y firma. En staging la página es una prueba: no
    pide Firma Digital y el PDF sale firmado con un certificado de prueba («sin
@@ -38,6 +39,20 @@ En el `.env`:
 3. Cuando todos firman llega `envelope.completed`: aparece en **Eventos de webhook**
    y el PDF firmado queda en `firmados/`. Si no llega, pulsa **Actualizar estado** y
    descarga el PDF con el botón del documento.
+
+Dos opciones de `POST /envelopes` que el formulario deja probar:
+
+- **Correo del firmante** (`signers[].email`, opcional): si lo escribes, FirmaYa le
+  envía a ese firmante el correo de solicitud de firma con su enlace personal — el
+  mismo `sign_url` que devuelve la API. Un correo mal escrito se rechaza con
+  `invalid_email`, y no se puede repetir entre firmantes. Si el correo no se pudo
+  enviar, la solicitud se crea igual.
+- **Quién puede abrir los enlaces** (`link_access`, opcional): **externos**
+  (`{"audience": "anyone"}`, cualquiera con el enlace) o **internos**
+  (`{"audience": "organization", "domain": "empresa.com"}`, solo cuentas de FirmaYa
+  con correo de ese dominio). Con «La opción del panel» no se envía y vale lo
+  configurado en Connect. Sin dominio aquí ni en el panel, la API responde
+  `domain_required`.
 
 Staging no tiene límite de solicitudes. Cada solicitud admite hasta **20 PDF** (10 MB
 cada uno, 30 MB en total) y hasta **10 firmantes**. Producción (`fy_live_…`) necesita
